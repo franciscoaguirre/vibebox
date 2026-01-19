@@ -1,0 +1,184 @@
+#!/usr/bin/ruby
+
+require "tmpdir"
+require "shellwords"
+require "fileutils"
+require "json"
+
+CWD = File.expand_path(Dir.pwd)
+
+config_path = File.join(ENV["HOME"], ".vibebox.json")
+config = {}
+config = JSON.parse(File.read(config_path)) if File.exist?(config_path)
+config_modified = []
+
+def ask_confirmation(prompt = nil)
+    loop do
+        if prompt
+            STDOUT.print "#{prompt}> "
+        else
+            STDOUT.print "y/n> "
+        end
+        STDOUT.flush
+        yesno = STDIN.gets.strip.downcase
+        return true if yesno == "y" || yesno == "yes"
+        return false if yesno == "n" || yesno == "no"
+    end
+end
+
+ask_config = lambda do |key, label, prompt|
+    unless config.include? key
+        STDOUT.print "#{prompt}> "
+        STDOUT.flush
+        value = STDIN.gets.strip
+        config[key] = value
+        config_modified << [label, value]
+    end
+end
+
+ask_config.call "home", "Sandboxed $HOME path", "Type in the path to store your sandboxed $HOME"
+
+unless config_modified.empty?
+    puts
+    puts "These are your new settings:"
+    config_modified.each do |label, value|
+        puts "  #{label}: '#{value}'"
+    end
+    puts
+    puts "Do you confirm these settings?"
+    exit 1 unless ask_confirmation
+
+    File.write(config_path, JSON.pretty_generate(config) + "\n")
+    puts
+    puts "Config saved to '#{config_path}'!"
+    sleep 3
+end
+
+FileUtils.mkdir_p config["home"]
+
+uid = `id -u`.strip
+gid = `id -g`.strip
+raise if uid.empty? || gid.empty?
+
+PACKAGES = %w{
+    build-essential
+    ca-certificates
+    cmake
+    curl
+    file
+    g++
+    gcc
+    git
+    inetutils-ping
+    iproute2
+    less
+    libasound2-dev
+    libclang-18-dev
+    libclang-common-18-dev
+    libglib2.0-dev
+    libpixman-1-dev
+    libpython3-dev
+    libssl-dev
+    locales
+    make
+    mc
+    net-tools
+    ninja-build
+    npm
+    pkg-config
+    protobuf-compiler
+    python3
+    ripgrep
+    ruby
+    sudo
+}
+
+IMAGE_TAG = "vibebox"
+SANDBOX_USERNAME = "vibe"
+
+DOCKERFILE = <<-EOS
+FROM nvidia/cuda:13.1.0-devel-ubuntu24.04
+MAINTAINER Jan Bujak (j@exia.io)
+
+RUN DEBIAN_FRONTEND="noninteractive" apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends #{PACKAGES.join " "}
+RUN bash -c 'echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen' && locale-gen en_US.UTF-8 && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+RUN sed -i -E "s/ ALL$/ NOPASSWD: ALL/g" /etc/sudoers && sed -i 's/root:\\*/root:$6$Fc5teNQbSppq8I57$A1f7wwDpDKyHzb.0OPW6fpASde7sFtdiAA.2AZakKR8\\/vQ8WiRySJBY2Ueyk0N0O2FqEkaGRFakwgSH.kodG2\\//' /etc/shadow && userdel ubuntu && groupadd -g #{gid} #{SANDBOX_USERNAME} && useradd --uid #{uid} -g #{SANDBOX_USERNAME} -Ms /bin/bash #{SANDBOX_USERNAME} && usermod -a -G sudo #{SANDBOX_USERNAME} && mkdir -p /home/vibe && chown #{SANDBOX_USERNAME}:#{SANDBOX_USERNAME} /home/vibe
+USER #{SANDBOX_USERNAME}
+WORKDIR /home/#{SANDBOX_USERNAME}
+COPY .entrypoint.rb /home/ubuntu/.entrypoint.rb
+EOS
+
+SETUP_SH = <<-EOS
+#!/usr/bin/ruby
+require "fileutils"
+require "shellwords"
+
+[".bashrc", ".profile"].each do |filename|
+    target = "/home/#{SANDBOX_USERNAME}/" + filename
+    FileUtils.cp("/home/ubuntu/" + filename, target) unless File.exist?(target)
+end
+
+unless File.exist? "/home/#{SANDBOX_USERNAME}/.local/bin/uv"
+    puts "Installing uv...."
+    system "curl -LsSf https://astral.sh/uv/install.sh | sh"
+    raise "installation failed" if $?.exitstatus != 0
+end
+
+unless File.exist? "/home/#{SANDBOX_USERNAME}/.local/bin/vibe"
+    puts "Installing mistral-vibe..."
+    system "/home/#{SANDBOX_USERNAME}/.local/bin/uv tool install mistral-vibe"
+    raise "installation failed" if $?.exitstatus != 0
+end
+
+unless File.exist? "/home/#{SANDBOX_USERNAME}/.opencode/bin/opencode"
+    puts "Installing opencode..."
+    system "curl -fsSL https://opencode.ai/install | bash"
+    raise "installation failed" if $?.exitstatus != 0
+end
+
+unless File.exist? "/home/#{SANDBOX_USERNAME}/.local/bin/claude"
+    puts "Installing claude..."
+    system "curl -fsSL https://claude.ai/install.sh | bash"
+    raise "installation failed" if $?.exitstatus != 0
+end
+
+unless File.exist? "/home/#{SANDBOX_USERNAME}/.cargo/bin/rustup"
+    puts "Installing rustup..."
+    system "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+    raise "installation failed" if $?.exitstatus != 0
+end
+
+exec "/bin/bash"
+EOS
+
+Dir.mktmpdir do |tmpdir|
+    Dir.chdir(tmpdir) do
+        File.write(".entrypoint.rb", SETUP_SH)
+        File.chmod(0755, ".entrypoint.rb")
+        File.write("Dockerfile", DOCKERFILE)
+        command = "docker build -f Dockerfile -t #{IMAGE_TAG.shellescape} ./"
+        system command
+        raise unless $?.exitstatus == 0
+    end
+end
+
+command = [
+    "docker", "run",
+    "--rm",
+    "--hostname=localhost",
+    "--gpus=all",
+    "--tmpfs=/tmp:exec",
+    "--ipc=host",
+    "--net=host",
+    "--tty",
+    "--interactive",
+    "--volume", "#{config["home"]}:/home/#{SANDBOX_USERNAME}",
+    "--volume", "#{CWD}:#{CWD}",
+    "-w", CWD,
+    "-e", "TERM=#{ENV["TERM"]}",
+    "--entrypoint", "/home/ubuntu/.entrypoint.rb",
+    IMAGE_TAG
+]
+
+exec *command
