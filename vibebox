@@ -185,8 +185,19 @@ command = [
     "--volume", "#{CWD}:#{CWD}",
     "-w", CWD,
     "-e", "TERM=#{ENV["TERM"]}",
-    "--entrypoint", "/home/ubuntu/.entrypoint.rb",
-    IMAGE_TAG
+    "--entrypoint", "/home/ubuntu/.entrypoint.rb"
 ]
+
+if File.exist? "/dev/kvm"
+    kvm_group = `getent group kvm`.strip.split(":")[2]
+    if kvm_group != nil
+        command += [
+            "--device", "/dev/kvm",
+            "--group-add", kvm_group,
+        ]
+    end
+end
+
+command << IMAGE_TAG
 
 exec *command
