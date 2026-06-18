@@ -211,6 +211,10 @@ if File.exist? "/dev/kvm"
     end
 end
 
+ARGV.each do |arg|
+    command << arg
+end
+
 command << IMAGE_TAG
 
 exec *command
