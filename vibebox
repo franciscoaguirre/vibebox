@@ -184,6 +184,11 @@ Dir.mktmpdir do |tmpdir|
     end
 end
 
+term = ENV["TERM"]
+if term == "screen"
+    term = "rxvt-unicode-256color"
+end
+
 command = [
     "docker", "run",
     "--rm",
@@ -197,7 +202,7 @@ command = [
     "--volume", "#{config["home"]}:/home/#{SANDBOX_USERNAME}",
     "--volume", "#{CWD}:#{CWD}",
     "-w", CWD,
-    "-e", "TERM=#{ENV["TERM"]}",
+    "-e", "TERM=#{term}",
     "--entrypoint", "/home/ubuntu/.entrypoint.rb"
 ]
 
