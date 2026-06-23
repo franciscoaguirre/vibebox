@@ -118,7 +118,7 @@ MAINTAINER Jan Bujak (j@exia.io)
 RUN DEBIAN_FRONTEND="noninteractive" apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends #{PACKAGES.join " "}
 RUN bash -c 'echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen' && locale-gen en_US.UTF-8 && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
-RUN sed -i -E "s/ ALL$/ NOPASSWD: ALL/g" /etc/sudoers && sed -i 's/root:\\*/root:$6$Fc5teNQbSppq8I57$A1f7wwDpDKyHzb.0OPW6fpASde7sFtdiAA.2AZakKR8\\/vQ8WiRySJBY2Ueyk0N0O2FqEkaGRFakwgSH.kodG2\\//' /etc/shadow && userdel ubuntu && groupadd -g #{gid} #{SANDBOX_USERNAME} && useradd --uid #{uid} -g #{SANDBOX_USERNAME} -Ms /bin/bash #{SANDBOX_USERNAME} && usermod -a -G sudo #{SANDBOX_USERNAME} && mkdir -p /home/vibe && chown #{SANDBOX_USERNAME}:#{SANDBOX_USERNAME} /home/vibe
+RUN sed -i -E "s/ ALL$/ NOPASSWD: ALL/g" /etc/sudoers && sed -i 's/root:\\*/root:$6$Fc5teNQbSppq8I57$A1f7wwDpDKyHzb.0OPW6fpASde7sFtdiAA.2AZakKR8\\/vQ8WiRySJBY2Ueyk0N0O2FqEkaGRFakwgSH.kodG2\\//' /etc/shadow && userdel ubuntu && groupadd -o -g #{gid} #{SANDBOX_USERNAME} && useradd --uid #{uid} -g #{SANDBOX_USERNAME} -Ms /bin/bash #{SANDBOX_USERNAME} && usermod -a -G sudo #{SANDBOX_USERNAME} && mkdir -p /home/vibe && chown #{SANDBOX_USERNAME}:#{SANDBOX_USERNAME} /home/vibe
 USER #{SANDBOX_USERNAME}
 WORKDIR /home/#{SANDBOX_USERNAME}
 COPY .entrypoint.rb /home/ubuntu/.entrypoint.rb
