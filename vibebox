@@ -112,7 +112,7 @@ IMAGE_TAG = "vibebox"
 SANDBOX_USERNAME = "vibe"
 
 DOCKERFILE = <<-EOS
-FROM nvidia/cuda:13.1.0-devel-ubuntu24.04
+FROM ubuntu:24.04
 MAINTAINER Jan Bujak (j@exia.io)
 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends #{PACKAGES.join " "}
@@ -193,7 +193,6 @@ command = [
     "docker", "run",
     "--rm",
     "--hostname=localhost",
-    "--gpus=all",
     "--tmpfs=/tmp:exec",
     "--ipc=host",
     "--net=host",
