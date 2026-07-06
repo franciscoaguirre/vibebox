@@ -94,7 +94,6 @@ PACKAGES = %w{
     mc
     net-tools
     ninja-build
-    npm
     pkg-config
     protobuf-compiler
     python3
@@ -121,6 +120,7 @@ RUN bash -c 'echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen' && locale-gen en_US.UT
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 RUN sed -i -E "s/ ALL$/ NOPASSWD: ALL/g" /etc/sudoers && sed -i 's/root:\\*/root:$6$Fc5teNQbSppq8I57$A1f7wwDpDKyHzb.0OPW6fpASde7sFtdiAA.2AZakKR8\\/vQ8WiRySJBY2Ueyk0N0O2FqEkaGRFakwgSH.kodG2\\//' /etc/shadow && userdel ubuntu && groupadd -o -g #{gid} #{SANDBOX_USERNAME} && useradd --uid #{uid} -g #{SANDBOX_USERNAME} -Ms /bin/bash #{SANDBOX_USERNAME} && usermod -a -G sudo #{SANDBOX_USERNAME} && mkdir -p /home/vibe && chown #{SANDBOX_USERNAME}:#{SANDBOX_USERNAME} /home/vibe && chmod 755 /home/ubuntu
 RUN mkdir -p -m 755 /etc/apt/keyrings && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list && DEBIAN_FRONTEND="noninteractive" apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends gh
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends nodejs && corepack enable && corepack prepare pnpm@latest --activate
 USER #{SANDBOX_USERNAME}
 WORKDIR /home/#{SANDBOX_USERNAME}
 COPY .entrypoint.rb /home/ubuntu/.entrypoint.rb
