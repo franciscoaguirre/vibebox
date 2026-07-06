@@ -237,6 +237,20 @@ if base_repo_path != CWD && Dir.exist?(base_repo_path)
     puts "Mounting base repository: #{base_repo_path}"
 end
 
+# Extra read-only reference mounts. Add a "mounts" array of absolute paths to
+# ~/.vibebox.json to make other repos on your machine visible inside the
+# container. Each is mounted read-only at its same absolute path, so absolute
+# paths resolve identically inside and outside the container.
+Array(config["mounts"]).each do |mount|
+    path = File.expand_path(mount.to_s)
+    unless Dir.exist?(path)
+        puts "Skipping missing mount: #{path}"
+        next
+    end
+    command += ["--volume", "#{path}:#{path}:ro"]
+    puts "Mounting reference (read-only): #{path}"
+end
+
 command << IMAGE_TAG
 
 exec *command
