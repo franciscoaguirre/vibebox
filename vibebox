@@ -131,6 +131,20 @@ SETUP_SH = <<-EOS
 require "fileutils"
 require "shellwords"
 
+ENV["PATH"] = [
+    "/home/#{SANDBOX_USERNAME}/.local/bin",
+    "/home/#{SANDBOX_USERNAME}/.kimi-code/bin",
+    "/home/#{SANDBOX_USERNAME}/.cargo/bin",
+    "/home/#{SANDBOX_USERNAME}/.opencode/bin",
+    ENV["PATH"]
+].join(":")
+
+# The container image only ships a common terminfo database. Force a
+# widely-supported, color-capable terminal type so color rendering works
+# regardless of the host terminal emulator (alacritty, kitty, etc.).
+ENV["TERM"] = "xterm-256color"
+ENV.delete("NO_COLOR")
+
 [".bashrc", ".profile"].each do |filename|
     target = "/home/#{SANDBOX_USERNAME}/" + filename
     FileUtils.cp("/home/ubuntu/" + filename, target) unless File.exist?(target)
@@ -166,9 +180,9 @@ unless File.exist? "/home/#{SANDBOX_USERNAME}/.cargo/bin/rustup"
     raise "installation failed" if $?.exitstatus != 0
 end
 
-unless File.exist? "/home/#{SANDBOX_USERNAME}/.local/bin/kimi"
+unless File.exist? "/home/#{SANDBOX_USERNAME}/.kimi-code/bin/kimi"
     puts "Installing kimi..."
-    system "curl -L code.kimi.com/install.sh | bash"
+    system "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash"
     raise "installation failed" if $?.exitstatus != 0
 end
 
@@ -186,10 +200,10 @@ Dir.mktmpdir do |tmpdir|
     end
 end
 
-term = ENV["TERM"]
-if term == "screen"
-    term = "rxvt-unicode-256color"
-end
+# The container image only ships common terminfo entries; exotic host terminals
+# like alacritty/kitty have no entry inside the container and break color output.
+# Force xterm-256color so colors always work.
+term = "xterm-256color"
 
 command = [
     "docker", "run",
@@ -200,6 +214,7 @@ command = [
     "--net=host",
     "--tty",
     "--interactive",
+    "--userns=keep-id",
     "--volume", "#{config["home"]}:/home/#{SANDBOX_USERNAME}",
     "--volume", "#{CWD}:#{CWD}",
     "-w", CWD,
