@@ -180,17 +180,13 @@ unless File.exist? "/home/#{SANDBOX_USERNAME}/.cargo/bin/rustup"
     raise "installation failed" if $?.exitstatus != 0
 end
 
-<<<<<<< Updated upstream
-unless File.exist? "/home/#{SANDBOX_USERNAME}/.kimi-code/bin/kimi"
-=======
 unless File.exist? "/home/#{SANDBOX_USERNAME}/.cargo/bin/cargo-remote"
     puts "Installing cargo-remote..."
     system "/home/#{SANDBOX_USERNAME}/.cargo/bin/cargo install cargo-remote"
     raise "installation failed" if $?.exitstatus != 0
 end
 
-unless File.exist? "/home/#{SANDBOX_USERNAME}/.local/bin/kimi"
->>>>>>> Stashed changes
+unless File.exist? "/home/#{SANDBOX_USERNAME}/.kimi-code/bin/kimi"
     puts "Installing kimi..."
     system "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash"
     raise "installation failed" if $?.exitstatus != 0
