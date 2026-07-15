@@ -61,6 +61,11 @@ uid = `id -u`.strip
 gid = `id -g`.strip
 raise if uid.empty? || gid.empty?
 
+# Podman (rootless) remaps UIDs via subuid ranges, so it needs --userns=keep-id
+# to line the container's `vibe` user up with the host user. Docker runs the uid
+# as-is and rejects "keep-id" as an invalid USER mode, so only pass it for Podman.
+is_podman = `docker --version 2>/dev/null`.strip.downcase.include?("podman")
+
 PACKAGES = %w{
     build-essential
     ca-certificates
@@ -220,13 +225,14 @@ command = [
     "--net=host",
     "--tty",
     "--interactive",
-    "--userns=keep-id",
     "--volume", "#{config["home"]}:/home/#{SANDBOX_USERNAME}",
     "--volume", "#{CWD}:#{CWD}",
     "-w", CWD,
     "-e", "TERM=#{term}",
     "--entrypoint", "/home/ubuntu/.entrypoint.rb"
 ]
+
+command += ["--userns=keep-id"] if is_podman
 
 github_token = config["github_token"].to_s.strip
 command += ["-e", "GH_TOKEN=#{github_token}"] unless github_token.empty?
