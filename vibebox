@@ -180,7 +180,17 @@ unless File.exist? "/home/#{SANDBOX_USERNAME}/.cargo/bin/rustup"
     raise "installation failed" if $?.exitstatus != 0
 end
 
+<<<<<<< Updated upstream
 unless File.exist? "/home/#{SANDBOX_USERNAME}/.kimi-code/bin/kimi"
+=======
+unless File.exist? "/home/#{SANDBOX_USERNAME}/.cargo/bin/cargo-remote"
+    puts "Installing cargo-remote..."
+    system "/home/#{SANDBOX_USERNAME}/.cargo/bin/cargo install cargo-remote"
+    raise "installation failed" if $?.exitstatus != 0
+end
+
+unless File.exist? "/home/#{SANDBOX_USERNAME}/.local/bin/kimi"
+>>>>>>> Stashed changes
     puts "Installing kimi..."
     system "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash"
     raise "installation failed" if $?.exitstatus != 0
@@ -247,8 +257,13 @@ end
 base_repo_name = File.basename(CWD).split(".", 2).first
 base_repo_path = File.join(File.dirname(CWD), base_repo_name)
 
+# Track the container target paths already mounted so later reference mounts can
+# skip anything that would collide (Docker errors on duplicate target paths).
+mounted_paths = [CWD]
+
 if base_repo_path != CWD && Dir.exist?(base_repo_path)
     command += ["--volume", "#{base_repo_path}:#{base_repo_path}"]
+    mounted_paths << base_repo_path
     puts "Mounting base repository: #{base_repo_path}"
 end
 
@@ -262,7 +277,12 @@ Array(config["mounts"]).each do |mount|
         puts "Skipping missing mount: #{path}"
         next
     end
+    if mounted_paths.include?(path)
+        puts "Skipping already-mounted reference: #{path}"
+        next
+    end
     command += ["--volume", "#{path}:#{path}:ro"]
+    mounted_paths << path
     puts "Mounting reference (read-only): #{path}"
 end
 
